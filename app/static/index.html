@@ -1,0 +1,1243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sandbox Orchestration</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #16202a;
+        --muted: #66717d;
+        --line: #d8dee5;
+        --panel: #ffffff;
+        --soft: #f4f7f5;
+        --green: #186b55;
+        --blue: #235b8e;
+        --red: #a33a3a;
+        --amber: #8a6215;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--soft);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: #fbfcfb;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.1;
+      }
+
+      .subtitle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+        gap: 18px;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 18px 24px 36px;
+      }
+
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .stack {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 54px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+      }
+
+      .body {
+        padding: 16px;
+      }
+
+      form {
+        display: grid;
+        gap: 10px;
+      }
+
+      label {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        font-size: 14px;
+      }
+
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+
+      button {
+        min-height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 8px 11px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      button.secondary {
+        border-color: #9ab6d0;
+        color: var(--blue);
+      }
+
+      button.warn {
+        border-color: #d9bd78;
+        color: var(--amber);
+      }
+
+      .inline {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tabs button.active {
+        background: #1d2732;
+        border-color: #1d2732;
+        color: #fff;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        background: #f7f9fb;
+        font-size: 12px;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 750;
+      }
+
+      .pill.online,
+      .pill.active,
+      .pill.completed,
+      .pill.approved,
+      .pill.ready {
+        border-color: #a8cfbd;
+        color: var(--green);
+      }
+
+      .pill.busy,
+      .pill.pending,
+      .pill.open,
+      .pill.waiting_for_human,
+      .pill.needs_intervention {
+        border-color: #d9bd78;
+        color: var(--amber);
+      }
+
+      .pill.failed,
+      .pill.rejected,
+      .pill.expired,
+      .pill.needs_login {
+        border-color: #deb0b0;
+        color: var(--red);
+      }
+
+      .feed {
+        display: grid;
+        gap: 8px;
+      }
+
+      .event {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fbfcfb;
+      }
+
+      .event strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .event small {
+        color: var(--muted);
+      }
+
+      .status {
+        min-height: 28px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: end;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 980px) {
+        .topbar,
+        main {
+          grid-template-columns: 1fr;
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+
+        .grid,
+        .inline {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="topbar">
+        <div>
+          <h1>Sandbox Orchestration</h1>
+          <p class="subtitle">Resources, grants, run sessions, human execution, and audit.</p>
+        </div>
+        <div class="toolbar">
+          <button id="languageToggle" type="button">English</button>
+          <button class="secondary" id="seedDemo">Seed Demo</button>
+          <button id="refreshAll">Refresh</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="stack">
+        <section>
+          <div class="section-head">
+            <h2>Register</h2>
+          </div>
+          <div class="body">
+            <form id="registerForm">
+              <div class="inline">
+                <label>
+                  Executor name
+                  <input name="executorName" value="android-lab-01" />
+                </label>
+                <label>
+                  Executor kind
+                  <select name="executorKind">
+                    <option value="android_device_agent">Android device agent</option>
+                    <option value="human_workbench">Human workbench</option>
+                    <option value="devbox">Devbox</option>
+                    <option value="file_agent">File agent</option>
+                  </select>
+                </label>
+              </div>
+              <div class="inline">
+                <label>
+                  Resource name
+                  <input name="resourceName" value="Pixel 8 - WeChat Publisher" />
+                </label>
+                <label>
+                  Resource kind
+                  <select name="resourceKind">
+                    <option value="device">Device</option>
+                    <option value="human">Human</option>
+                    <option value="cli">CLI</option>
+                    <option value="file">File</option>
+                  </select>
+                </label>
+              </div>
+              <div class="inline">
+                <label>
+                  Device serial
+                  <input name="deviceSerial" value="lab-pixel-8" />
+                </label>
+                <label>
+                  CLI command
+                  <input name="command" placeholder="tccli" />
+                </label>
+              </div>
+              <label>
+                Metadata JSON
+                <textarea name="resourceMetadata">{"apps":["com.tencent.mm","com.tencent.mp"],"accounts":["wechat-main"],"login_state":"ready"}</textarea>
+              </label>
+              <button class="primary" type="submit">Register executor and resource</button>
+            </form>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>Account</h2>
+          </div>
+          <div class="body">
+            <form id="accountForm">
+              <label>
+                Resource
+                <select name="resourceId" data-bind="resources"></select>
+              </label>
+              <div class="inline">
+                <label>
+                  Label
+                  <input name="label" value="WeChat main account" />
+                </label>
+                <label>
+                  Account ref
+                  <input name="accountRef" value="device-local:wechat-main" />
+                </label>
+              </div>
+              <div class="inline">
+                <label>
+                  Status
+                  <select name="status">
+                    <option value="ready">Ready</option>
+                    <option value="needs_login">Needs login</option>
+                    <option value="expired">Expired</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </label>
+                <label>
+                  Login strategy
+                  <input name="loginStrategy" value="human verify_code when challenged" />
+                </label>
+              </div>
+              <button class="primary" type="submit">Register account profile</button>
+            </form>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>Request</h2>
+          </div>
+          <div class="body">
+            <form id="requestForm">
+              <label>
+                Resource
+                <select name="resourceId" data-bind="resources"></select>
+              </label>
+              <div class="inline">
+                <label>
+                  Agent
+                  <input name="agentId" value="agent-publisher-01" />
+                </label>
+                <label>
+                  Minutes
+                  <input name="minutes" type="number" min="1" max="1440" value="30" />
+                </label>
+              </div>
+              <label>
+                Purpose
+                <input name="purpose" value="Publish article draft through Android app" />
+              </label>
+              <label>
+                Actions
+                <input name="actions" value="view,tap,input,open_app,upload_file" />
+              </label>
+              <button class="primary" type="submit">Create resource request</button>
+            </form>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>Operate</h2>
+          </div>
+          <div class="body">
+            <div class="stack">
+              <form id="runForm">
+                <label>
+                  Approved request
+                  <select name="requestId" data-bind="approvedRequests"></select>
+                </label>
+                <label>
+                  Objective
+                  <input name="objective" value="Open publisher app and prepare article submission" />
+                </label>
+                <button class="primary" type="submit">Start run session</button>
+              </form>
+              <form id="actionForm">
+                <label>
+                  Run session
+                  <select name="runSessionId" data-bind="activeRuns"></select>
+                </label>
+                <div class="inline">
+                  <label>
+                    Action
+                    <input name="action" value="tap" />
+                  </label>
+                  <label>
+                    Evidence URI
+                    <input name="evidenceUri" value="screen://latest" />
+                  </label>
+                </div>
+                <label>
+                  Summary
+                  <input name="summary" value="Tapped compose button after app opened" />
+                </label>
+                <button class="secondary" type="submit">Record action</button>
+              </form>
+              <form id="humanTaskForm">
+                <label>
+                  Run session
+                  <select name="runSessionId" data-bind="activeRuns"></select>
+                </label>
+                <div class="inline">
+                  <label>
+                    Task type
+                    <select name="taskType">
+                      <option value="verify_code">Verify code</option>
+                      <option value="login">Login</option>
+                      <option value="review">Review</option>
+                      <option value="manual_execute">Manual execute</option>
+                      <option value="recover_session">Recover session</option>
+                    </select>
+                  </label>
+                  <label>
+                    Title
+                    <input name="title" value="WeChat verification challenge" />
+                  </label>
+                </div>
+                <label>
+                  Instructions
+                  <input name="instructions" value="Complete the phone-side verification challenge, then mark done." />
+                </label>
+                <button class="warn" type="submit">Create human task</button>
+              </form>
+            </div>
+          </div>
+        </section>
+        <p class="status" id="status"></p>
+      </div>
+
+      <div class="stack">
+        <section>
+          <div class="section-head">
+            <h2>Control Plane</h2>
+            <div class="tabs" id="tabs">
+              <button data-view="resources" class="active">Resources</button>
+              <button data-view="requests">Requests</button>
+              <button data-view="runs">Runs</button>
+              <button data-view="humans">Human Tasks</button>
+              <button data-view="audit">Audit</button>
+            </div>
+          </div>
+          <div class="body">
+            <div id="resources" class="view active">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Name</th><th>Kind</th><th>Status</th><th>Binding</th><th>Metadata</th><th>State</th></tr>
+                  </thead>
+                  <tbody id="resourcesBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="requests" class="view">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Request</th><th>Agent</th><th>Resource</th><th>Actions</th><th>Status</th><th>Grant</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="requestsBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="runs" class="view">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Run</th><th>Agent</th><th>Resource</th><th>Status</th><th>Objective</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="runsBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="humans" class="view">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Task</th><th>Run</th><th>Type</th><th>Status</th><th>Instructions</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="humanTasksBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="audit" class="view">
+              <div class="split">
+                <label>
+                  Run session
+                  <select id="auditRunSelect" data-bind="runs"></select>
+                </label>
+                <button id="loadAudit">Load audit</button>
+              </div>
+              <div class="feed" id="auditFeed" style="margin-top: 12px;"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const state = {
+        resources: [],
+        requests: [],
+        runs: [],
+        humanTasks: [],
+        grants: new Map(),
+      };
+
+      const textPairs = [
+        ["Sandbox Orchestration", "沙盒编排平台"],
+        ["Resources, grants, run sessions, human execution, and audit.", "资源、授权、运行会话、人工执行与审计。"],
+        ["Seed Demo", "填充演示数据"],
+        ["Refresh", "刷新"],
+        ["Register", "登记"],
+        ["Executor name", "执行端名称"],
+        ["Executor kind", "执行端类型"],
+        ["Android device agent", "安卓设备代理"],
+        ["Human workbench", "人工执行工作台"],
+        ["Devbox", "开发机"],
+        ["File agent", "文件代理"],
+        ["Resource name", "资源名称"],
+        ["Resource kind", "资源类型"],
+        ["Device", "设备"],
+        ["Human", "人"],
+        ["CLI", "命令行"],
+        ["File", "文件"],
+        ["Device serial", "设备序列号"],
+        ["CLI command", "命令行命令"],
+        ["Metadata JSON", "元数据 JSON"],
+        ["Register executor and resource", "登记执行端和资源"],
+        ["Account", "账号"],
+        ["Resource", "资源"],
+        ["Label", "标签"],
+        ["Account ref", "账号引用"],
+        ["Status", "状态"],
+        ["Ready", "就绪"],
+        ["Needs login", "需要登录"],
+        ["Expired", "已过期"],
+        ["Unknown", "未知"],
+        ["Login strategy", "登录策略"],
+        ["Register account profile", "登记账号档案"],
+        ["Request", "申请"],
+        ["Agent", "Agent"],
+        ["Minutes", "分钟"],
+        ["Purpose", "用途"],
+        ["Actions", "动作"],
+        ["Create resource request", "创建资源申请"],
+        ["Operate", "操作"],
+        ["Approved request", "已批准申请"],
+        ["Objective", "目标"],
+        ["Start run session", "启动运行会话"],
+        ["Run session", "运行会话"],
+        ["Action", "操作"],
+        ["Evidence URI", "证据 URI"],
+        ["Summary", "摘要"],
+        ["Record action", "记录操作"],
+        ["Task type", "任务类型"],
+        ["Verify code", "验证码"],
+        ["Login", "登录"],
+        ["Review", "审核"],
+        ["Manual execute", "人工执行"],
+        ["Recover session", "恢复会话"],
+        ["Title", "标题"],
+        ["Instructions", "说明"],
+        ["Create human task", "创建人工任务"],
+        ["Control Plane", "控制面板"],
+        ["Resources", "资源"],
+        ["Requests", "申请"],
+        ["Runs", "运行"],
+        ["Human Tasks", "人工任务"],
+        ["Audit", "审计"],
+        ["Name", "名称"],
+        ["Kind", "类型"],
+        ["Binding", "绑定"],
+        ["Metadata", "元数据"],
+        ["State", "状态详情"],
+        ["Grant", "授权"],
+        ["Run", "运行"],
+        ["Task", "任务"],
+        ["Type", "类型"],
+        ["Load audit", "加载审计"],
+        ["Open state", "查看状态"],
+        ["Approve", "批准"],
+        ["Complete", "完成"],
+        ["Mark done", "标记完成"],
+        ["Demo resources registered.", "演示资源已登记。"],
+        ["Resource registered.", "资源已登记。"],
+        ["Account profile registered.", "账号档案已登记。"],
+        ["Resource request created.", "资源申请已创建。"],
+        ["Run session started.", "运行会话已启动。"],
+        ["Action recorded.", "操作已记录。"],
+        ["Human task created.", "人工任务已创建。"],
+        ["Request approved and grant created.", "申请已批准，授权已创建。"],
+        ["Run session completed.", "运行会话已完成。"],
+        ["Human task completed.", "人工任务已完成。"],
+        ["Audit events loaded.", "审计事件已加载。"],
+      ];
+
+      const valuePairs = [
+        ["Pixel 8 - WeChat Publisher", "Pixel 8 - 微信发布设备"],
+        ["WeChat main account", "微信主账号"],
+        ["human verify_code when challenged", "遇到验证码挑战时由人工处理"],
+        ["Publish article draft through Android app", "通过安卓应用发布文章草稿"],
+        ["Open publisher app and prepare article submission", "打开发布应用并准备提交文章"],
+        ["Tapped compose button after app opened", "应用打开后点击写作按钮"],
+        ["WeChat verification challenge", "微信验证挑战"],
+        ["Complete the phone-side verification challenge, then mark done.", "完成手机端验证挑战，然后标记完成。"],
+      ];
+
+      const labels = {
+        zh: {
+          online: "在线",
+          offline: "离线",
+          busy: "占用中",
+          needs_intervention: "需要人工介入",
+          pending: "待处理",
+          approved: "已批准",
+          rejected: "已拒绝",
+          active: "活跃",
+          consumed: "已使用",
+          expired: "已过期",
+          revoked: "已撤销",
+          waiting_for_human: "等待人工",
+          completed: "已完成",
+          failed: "失败",
+          open: "待处理",
+          claimed: "已领取",
+          ready: "就绪",
+          needs_login: "需要登录",
+          unknown: "未知",
+          device: "设备",
+          human: "人",
+          cli: "命令行",
+          file: "文件",
+          view: "查看",
+          tap: "点击",
+          input: "输入",
+          open_app: "打开应用",
+          upload_file: "上传文件",
+          download_artifact: "下载产物",
+          login: "登录",
+          verify_code: "验证码",
+          review: "审核",
+          manual_execute: "人工执行",
+          recover_session: "恢复会话",
+          actor: "执行者",
+          loadedStatePrefix: "已加载状态：",
+        },
+        en: {
+          online: "online",
+          offline: "offline",
+          busy: "busy",
+          needs_intervention: "needs intervention",
+          pending: "pending",
+          approved: "approved",
+          rejected: "rejected",
+          active: "active",
+          consumed: "consumed",
+          expired: "expired",
+          revoked: "revoked",
+          waiting_for_human: "waiting for human",
+          completed: "completed",
+          failed: "failed",
+          open: "open",
+          claimed: "claimed",
+          ready: "ready",
+          needs_login: "needs login",
+          unknown: "unknown",
+          device: "device",
+          human: "human",
+          cli: "cli",
+          file: "file",
+          view: "view",
+          tap: "tap",
+          input: "input",
+          open_app: "open app",
+          upload_file: "upload file",
+          download_artifact: "download artifact",
+          login: "login",
+          verify_code: "verify code",
+          review: "review",
+          manual_execute: "manual execute",
+          recover_session: "recover session",
+          actor: "actor",
+          loadedStatePrefix: "Loaded state for ",
+        },
+      };
+
+      const requestedLocale = new URLSearchParams(window.location.search).get("lang");
+      let locale = requestedLocale === "en" || requestedLocale === "zh"
+        ? requestedLocale
+        : localStorage.getItem("sandboxOrchestrationLocale") || "zh";
+      const byEnglish = new Map(textPairs.map(([en, zh]) => [en, { en, zh }]));
+      const byChinese = new Map(textPairs.map(([en, zh]) => [zh, { en, zh }]));
+      const valueByEnglish = new Map(valuePairs.map(([en, zh]) => [en, { en, zh }]));
+      const valueByChinese = new Map(valuePairs.map(([en, zh]) => [zh, { en, zh }]));
+
+      const tr = (english) => {
+        const pair = byEnglish.get(english);
+        return pair && locale === "zh" ? pair.zh : english;
+      };
+
+      const trValue = (value) => {
+        const pair = valueByEnglish.get(value) || valueByChinese.get(value);
+        if (!pair) return value;
+        return locale === "zh" ? pair.zh : pair.en;
+      };
+
+      const labelFor = (value) => labels[locale][value] || value;
+
+      const translateTextNode = (node) => {
+        const trimmed = node.nodeValue.trim();
+        if (!trimmed) return;
+        const pair = byEnglish.get(trimmed) || byChinese.get(trimmed);
+        if (!pair) return;
+        const leading = node.nodeValue.match(/^\s*/)[0];
+        const trailing = node.nodeValue.match(/\s*$/)[0];
+        node.nodeValue = `${leading}${locale === "zh" ? pair.zh : pair.en}${trailing}`;
+      };
+
+      const applyLocale = () => {
+        document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+        document.title = locale === "zh" ? "沙盒编排平台" : "Sandbox Orchestration";
+        document.getElementById("languageToggle").textContent = locale === "zh" ? "English" : "中文";
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+          acceptNode(node) {
+            const tag = node.parentElement?.tagName;
+            if (["SCRIPT", "STYLE", "TEXTAREA", "CODE"].includes(tag)) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          },
+        });
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        nodes.forEach(translateTextNode);
+        document.querySelectorAll("input").forEach((input) => {
+          input.value = trValue(input.value);
+          input.placeholder = trValue(input.placeholder);
+        });
+      };
+
+      const api = async (path, options = {}) => {
+        const res = await fetch(`/api/v1${path}`, {
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options,
+        });
+        const text = await res.text();
+        const body = text ? JSON.parse(text) : null;
+        if (!res.ok) {
+          throw new Error(body?.detail || body?.error?.message || res.statusText);
+        }
+        return body;
+      };
+
+      const parseJson = (value, fallback = {}) => {
+        if (!value.trim()) return fallback;
+        return JSON.parse(value);
+      };
+
+      const setStatus = (message, isError = false) => {
+        const el = document.getElementById("status");
+        el.textContent = tr(message);
+        el.style.color = isError ? "var(--red)" : "var(--muted)";
+      };
+
+      const pill = (value) => `<span class="pill ${String(value).replaceAll(".", "_")}">${esc(labelFor(value))}</span>`;
+      const short = (value) => value ? `<code>${String(value).slice(0, 18)}</code>` : "";
+      const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]));
+      const json = (value) => `<code>${esc(JSON.stringify(value ?? {}))}</code>`;
+      const actionList = (actions) => actions.map(labelFor).join(", ");
+
+      const refresh = async () => {
+        const [resources, requests, runs, humanTasks] = await Promise.all([
+          api("/resources"),
+          api("/resource-requests"),
+          api("/run-sessions"),
+          api("/human-tasks"),
+        ]);
+        state.resources = resources;
+        state.requests = requests;
+        state.runs = runs;
+        state.humanTasks = humanTasks;
+        render();
+      };
+
+      const renderSelects = () => {
+        document.querySelectorAll('[data-bind="resources"]').forEach((select) => {
+          const current = select.value;
+          select.innerHTML = state.resources.map((r) => `<option value="${r.id}">${esc(r.name)} (${labelFor(r.kind)})</option>`).join("");
+          if (current) select.value = current;
+        });
+        document.querySelectorAll('[data-bind="approvedRequests"]').forEach((select) => {
+          const current = select.value;
+          const approved = state.requests.filter((r) => r.status === "approved" && r.grant_id);
+          select.innerHTML = approved.map((r) => `<option value="${r.id}">${short(r.id)} ${esc(r.purpose)}</option>`).join("");
+          if (current) select.value = current;
+        });
+        document.querySelectorAll('[data-bind="activeRuns"]').forEach((select) => {
+          const current = select.value;
+          const active = state.runs.filter((r) => ["active", "waiting_for_human"].includes(r.status));
+          select.innerHTML = active.map((r) => `<option value="${r.id}">${short(r.id)} ${esc(r.objective)}</option>`).join("");
+          if (current) select.value = current;
+        });
+        document.querySelectorAll('[data-bind="runs"]').forEach((select) => {
+          const current = select.value;
+          select.innerHTML = state.runs.map((r) => `<option value="${r.id}">${short(r.id)} ${esc(r.objective)}</option>`).join("");
+          if (current) select.value = current;
+        });
+      };
+
+      const render = () => {
+        renderSelects();
+        document.getElementById("resourcesBody").innerHTML = state.resources.map((r) => `
+          <tr>
+            <td>${esc(r.name)}<br>${short(r.id)}</td>
+            <td>${esc(labelFor(r.kind))}</td>
+            <td>${pill(r.status)}</td>
+            <td>${json(r.binding)}</td>
+            <td>${json(r.metadata)}</td>
+            <td><button data-state="${r.id}">${tr("Open state")}</button></td>
+          </tr>
+        `).join("");
+
+        document.getElementById("requestsBody").innerHTML = state.requests.map((r) => `
+          <tr>
+            <td>${short(r.id)}<br>${esc(r.purpose)}</td>
+            <td>${esc(r.agent_id)}</td>
+            <td>${short(r.resource_id)}</td>
+            <td>${esc(actionList(r.requested_actions))}</td>
+            <td>${pill(r.status)}</td>
+            <td>${short(r.grant_id)}</td>
+            <td>${r.status === "pending" ? `<button class="primary" data-approve="${r.id}">${tr("Approve")}</button>` : ""}</td>
+          </tr>
+        `).join("");
+
+        document.getElementById("runsBody").innerHTML = state.runs.map((r) => `
+          <tr>
+            <td>${short(r.id)}<br>${short(r.grant_id)}</td>
+            <td>${esc(r.agent_id)}</td>
+            <td>${short(r.resource_id)}</td>
+            <td>${pill(r.status)}</td>
+            <td>${esc(r.objective)}</td>
+            <td>${["active", "waiting_for_human"].includes(r.status) ? `<button data-complete-run="${r.id}">${tr("Complete")}</button>` : ""}</td>
+          </tr>
+        `).join("");
+
+        document.getElementById("humanTasksBody").innerHTML = state.humanTasks.map((t) => `
+          <tr>
+            <td>${short(t.id)}<br>${esc(t.title)}</td>
+            <td>${short(t.run_session_id)}</td>
+            <td>${esc(labelFor(t.task_type))}</td>
+            <td>${pill(t.status)}</td>
+            <td>${esc(t.instructions)}</td>
+            <td>${["open", "claimed"].includes(t.status) ? `<button class="primary" data-complete-task="${t.id}">${tr("Mark done")}</button>` : esc(t.result || "")}</td>
+          </tr>
+        `).join("");
+        applyLocale();
+      };
+
+      const seedDemo = async () => {
+        const executor = await api("/executors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: "android-lab-01",
+            kind: "android_device_agent",
+            connection_hint: { endpoint: "adb-proxy://lab/android-lab-01" },
+          }),
+        });
+        const humanExecutor = await api("/executors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: locale === "zh" ? "人工操作台" : "operator-workbench",
+            kind: "human_workbench",
+            connection_hint: { queue: "ops-main" },
+          }),
+        });
+        const device = await api("/resources", {
+          method: "POST",
+          body: JSON.stringify({
+            name: trValue("Pixel 8 - WeChat Publisher"),
+            kind: "device",
+            binding: { executor_id: executor.id, device_serial: "lab-pixel-8" },
+            capabilities: ["view", "tap", "input", "open_app", "upload_file", "download_artifact"],
+            metadata: { apps: ["com.tencent.mm", "com.tencent.mp"], accounts: ["wechat-main"], login_state: "ready" },
+            intervention_policy: locale === "zh" ? "登录、验证码、审核或恢复会话时创建人工任务。" : "Create human task for login, verify_code, review, or recover_session.",
+          }),
+        });
+        await api("/resources", {
+          method: "POST",
+          body: JSON.stringify({
+            name: locale === "zh" ? "主人工执行者" : "Primary human operator",
+            kind: "human",
+            binding: { executor_id: humanExecutor.id },
+            capabilities: ["login", "verify_code", "review", "manual_execute", "recover_session"],
+            metadata: { timezone: "Asia/Shanghai", queue: "ops-main" },
+          }),
+        });
+        await api("/account-profiles", {
+          method: "POST",
+          body: JSON.stringify({
+            resource_id: device.id,
+            label: trValue("WeChat main account"),
+            account_ref: "device-local:wechat-main",
+            status: "ready",
+            login_strategy: trValue("human verify_code when challenged"),
+          }),
+        });
+        await refresh();
+        setStatus("Demo resources registered.");
+      };
+
+      document.getElementById("tabs").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-view]");
+        if (!button) return;
+        document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === button));
+        document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === button.dataset.view));
+      });
+
+      document.getElementById("languageToggle").addEventListener("click", () => {
+        locale = locale === "zh" ? "en" : "zh";
+        localStorage.setItem("sandboxOrchestrationLocale", locale);
+        render();
+        applyLocale();
+      });
+
+      document.getElementById("refreshAll").addEventListener("click", () => refresh().catch((err) => setStatus(err.message, true)));
+      document.getElementById("seedDemo").addEventListener("click", () => seedDemo().catch((err) => setStatus(err.message, true)));
+
+      document.getElementById("registerForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          const executor = await api("/executors", {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.get("executorName"),
+              kind: form.get("executorKind"),
+              connection_hint: { registered_from: "console" },
+            }),
+          });
+          const kind = form.get("resourceKind");
+          const binding = { executor_id: executor.id };
+          if (form.get("deviceSerial")) binding.device_serial = form.get("deviceSerial");
+          if (form.get("command")) binding.command = form.get("command");
+          await api("/resources", {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.get("resourceName"),
+              kind,
+              binding,
+              metadata: parseJson(form.get("resourceMetadata"), {}),
+              intervention_policy: locale === "zh" ? "执行端上报需要介入时，由工作流创建人工任务" : "workflow creates human task when the executor reports intervention_required",
+            }),
+          });
+          await refresh();
+          setStatus("Resource registered.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.getElementById("accountForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await api("/account-profiles", {
+            method: "POST",
+            body: JSON.stringify({
+              resource_id: form.get("resourceId"),
+              label: form.get("label"),
+              account_ref: form.get("accountRef"),
+              status: form.get("status"),
+              login_strategy: form.get("loginStrategy"),
+            }),
+          });
+          await refresh();
+          setStatus("Account profile registered.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.getElementById("requestForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await api("/resource-requests", {
+            method: "POST",
+            body: JSON.stringify({
+              agent_id: form.get("agentId"),
+              resource_id: form.get("resourceId"),
+              purpose: form.get("purpose"),
+              requested_actions: String(form.get("actions")).split(",").map((x) => x.trim()).filter(Boolean),
+              requested_minutes: Number(form.get("minutes")),
+            }),
+          });
+          await refresh();
+          setStatus("Resource request created.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.getElementById("runForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          const request = state.requests.find((r) => r.id === form.get("requestId"));
+          await api("/run-sessions", {
+            method: "POST",
+            body: JSON.stringify({
+              grant_id: request.grant_id,
+              agent_id: request.agent_id,
+              objective: form.get("objective"),
+            }),
+          });
+          await refresh();
+          setStatus("Run session started.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.getElementById("actionForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await api(`/run-sessions/${form.get("runSessionId")}/actions`, {
+            method: "POST",
+            body: JSON.stringify({
+              action: form.get("action"),
+              summary: form.get("summary"),
+              evidence_uri: form.get("evidenceUri"),
+            }),
+          });
+          await refresh();
+          setStatus("Action recorded.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.getElementById("humanTaskForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        try {
+          await api("/human-tasks", {
+            method: "POST",
+            body: JSON.stringify({
+              run_session_id: form.get("runSessionId"),
+              task_type: form.get("taskType"),
+              title: form.get("title"),
+              instructions: form.get("instructions"),
+            }),
+          });
+          await refresh();
+          setStatus("Human task created.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      document.body.addEventListener("click", async (event) => {
+        const approve = event.target.closest("[data-approve]");
+        const completeRun = event.target.closest("[data-complete-run]");
+        const completeTask = event.target.closest("[data-complete-task]");
+        const openState = event.target.closest("[data-state]");
+        try {
+          if (approve) {
+            await api(`/resource-requests/${approve.dataset.approve}/approve`, {
+              method: "POST",
+              body: JSON.stringify({ approver_id: "owner", audit_required: true }),
+            });
+            await refresh();
+            setStatus("Request approved and grant created.");
+          }
+          if (completeRun) {
+            await api(`/run-sessions/${completeRun.dataset.completeRun}/complete`, {
+              method: "POST",
+              body: JSON.stringify({ status: "completed", summary: locale === "zh" ? "运行成功后释放资源。" : "Released resource after successful run." }),
+            });
+            await refresh();
+            setStatus("Run session completed.");
+          }
+          if (completeTask) {
+            await api(`/human-tasks/${completeTask.dataset.completeTask}/complete`, {
+              method: "POST",
+              body: JSON.stringify({ status: "completed", result: locale === "zh" ? "人工介入已完成。" : "Human intervention completed." }),
+            });
+            await refresh();
+            setStatus("Human task completed.");
+          }
+          if (openState) {
+            const resourceState = await api(`/resources/${openState.dataset.state}/state`);
+            document.getElementById("auditFeed").innerHTML = resourceState.recent_audit_events.map(renderAuditEvent).join("");
+            document.querySelector('[data-view="audit"]').click();
+            setStatus(`${labels[locale].loadedStatePrefix}${resourceState.resource.name}`);
+          }
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      const renderAuditEvent = (event) => `
+        <div class="event">
+          <strong>${esc(event.event_type)} · ${esc(event.summary)}</strong>
+          <small>${esc(event.created_at)} · ${esc(labels[locale].actor)} ${esc(event.actor_id)} · ${esc(event.id)}</small>
+        </div>
+      `;
+
+      document.getElementById("loadAudit").addEventListener("click", async () => {
+        const runId = document.getElementById("auditRunSelect").value;
+        if (!runId) return;
+        try {
+          const events = await api(`/run-sessions/${runId}/audit-events`);
+          document.getElementById("auditFeed").innerHTML = events.map(renderAuditEvent).join("");
+          setStatus("Audit events loaded.");
+        } catch (err) {
+          setStatus(err.message, true);
+        }
+      });
+
+      applyLocale();
+      refresh().catch((err) => setStatus(err.message, true));
+    </script>
+  </body>
+</html>
