@@ -1,0 +1,27 @@
+apiVersion: v2
+name: bifurcate
+description: Experimental Bifurcate resource-lineage control plane
+type: application
+version: 0.1.0
+appVersion: "0.3.0"
+kubeVersion: ">=1.28.0-0"
+home: https://github.com/bifurcate-systems/bifurcate
+sources:
+  - https://github.com/bifurcate-systems/bifurcate
+keywords:
+  - bifurcate
+  - agents
+  - sandbox
+maintainers:
+  - name: Bifurcate Systems
+    url: https://github.com/bifurcate-systems
+annotations:
+  artifacthub.io/category: ai-machine-learning
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "true"
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial experimental OCI Helm chart with fail-closed write access.
+  artifacthub.io/images: |
+    - name: bifurcate
+      image: ghcr.io/bifurcate-systems/bifurcate:v0.1.0

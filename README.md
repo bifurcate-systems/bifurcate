@@ -4,6 +4,11 @@
 > This service is not production-ready: its current API is not tenant-isolated,
 > and it must not be exposed to untrusted clients or deployed as a shared service.
 
+The source, container image and Helm chart are publicly released under
+Apache-2.0. See [`charts/bifurcate`](charts/bifurcate) for the experimental
+single-replica install and [`docs/ARTIFACT_HUB.md`](docs/ARTIFACT_HUB.md) for
+the OCI/Artifact Hub publishing contract.
+
 Bifurcate is the purpose-to-consumption resource lineage control plane for
 agents. It records how homogeneous compute, network, storage, model and context
 resources become differentiated for a purpose, which dependency chain was
