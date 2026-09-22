@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "bifurcate"
 version = "0.3.0"
 description = "Purpose-to-consumption resource lineage control plane for CubeSandbox agents"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [

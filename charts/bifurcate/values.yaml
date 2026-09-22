@@ -1,0 +1,31 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/bifurcate-systems/bifurcate
+  tag: "v0.1.0"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+auth:
+  # Name of an existing Secret containing a non-empty `token` key.
+  # Without it, every mutating API request returns HTTP 503.
+  writeTokenSecretName: ""
+
+persistence:
+  # The JSON store is single-writer only. This option does not make the service
+  # multi-replica or tenant-safe.
+  enabled: false
+  existingClaim: ""
+  storageClassName: ""
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

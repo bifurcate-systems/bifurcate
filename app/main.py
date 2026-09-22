@@ -20,11 +20,14 @@ def create_app() -> FastAPI:
     )
     app.state.store = SandboxStore(os.getenv("BIFURCATE_STATE_PATH"))
     write_token = os.getenv("BIFURCATE_WRITE_TOKEN")
+    insecure_dev_mode = os.getenv("BIFURCATE_INSECURE_DEV_MODE") == "1"
     app.include_router(api_router)
 
     @app.middleware("http")
     async def persist_mutations(request, call_next):
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and write_token:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not insecure_dev_mode:
+            if not write_token:
+                return JSONResponse({"detail": "write access is disabled"}, status_code=503)
             if request.headers.get("authorization") != f"Bearer {write_token}":
                 return JSONResponse({"detail": "write authorization required"}, status_code=401)
         response = await call_next(request)
