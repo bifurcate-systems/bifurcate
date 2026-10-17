@@ -27,6 +27,8 @@ def create_app() -> FastAPI:
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and write_token:
             if request.headers.get("authorization") != f"Bearer {write_token}":
                 return JSONResponse({"detail": "write authorization required"}, status_code=401)
+            if not request.headers.get("x-re8ch-tenant"):
+                return JSONResponse({"detail": "verified tenant context required"}, status_code=400)
         response = await call_next(request)
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and response.status_code < 400:
             app.state.store.persist()

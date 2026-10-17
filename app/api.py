@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from .models import (
     AccountProfile,
@@ -42,6 +42,12 @@ from .models import (
     TaskEvent,
     TaskEventCreate,
     TaskView,
+    ServiceDefinition,
+    ServiceDefinitionCreate,
+    ExternalComputeProvider,
+    ExternalComputeProviderCreate,
+    UsageEvent,
+    UsageEventCreate,
 )
 from .store import SandboxStore
 
@@ -50,6 +56,12 @@ router = APIRouter(prefix="/api/v1", tags=["bifurcate"])
 
 def get_store(request: Request) -> SandboxStore:
     return request.app.state.store
+
+
+def tenant_context(x_re8ch_tenant: str = Header(default="legacy")) -> str:
+    if not x_re8ch_tenant or len(x_re8ch_tenant) > 80:
+        raise HTTPException(status_code=400, detail="invalid tenant context")
+    return x_re8ch_tenant
 
 
 @router.post("/agents/register", response_model=Agent, status_code=201)
@@ -121,30 +133,71 @@ def create_executor(payload: ExecutorCreate, store: SandboxStore = Depends(get_s
 
 
 @router.post("/resources", response_model=Resource, status_code=201)
-def create_resource(payload: ResourceCreate, store: SandboxStore = Depends(get_store)) -> Resource:
-    return store.create_resource(payload)
+def create_resource(payload: ResourceCreate, store: SandboxStore = Depends(get_store),
+                    tenant: str = Depends(tenant_context)) -> Resource:
+    return store.create_resource(payload.model_copy(update={"owner_tenant_ref": tenant}))
 
 
 @router.get("/resources", response_model=list[Resource])
-def list_resources(store: SandboxStore = Depends(get_store)) -> list[Resource]:
-    return store.list_resources()
+def list_resources(store: SandboxStore = Depends(get_store), tenant: str = Depends(tenant_context)) -> list[Resource]:
+    return store.list_resources(tenant)
 
 
 @router.post("/resource-dependencies", response_model=ResourceDependency, status_code=201)
 def create_resource_dependency(
-    payload: ResourceDependencyCreate, store: SandboxStore = Depends(get_store)
+    payload: ResourceDependencyCreate, store: SandboxStore = Depends(get_store),
+    tenant: str = Depends(tenant_context),
 ) -> ResourceDependency:
-    return store.create_dependency(payload)
+    return store.create_dependency(payload.model_copy(update={"owner_tenant_ref": tenant}))
 
 
 @router.get("/resource-dependencies", response_model=list[ResourceDependency])
-def list_resource_dependencies(store: SandboxStore = Depends(get_store)) -> list[ResourceDependency]:
-    return store.list_dependencies()
+def list_resource_dependencies(store: SandboxStore = Depends(get_store),
+                               tenant: str = Depends(tenant_context)) -> list[ResourceDependency]:
+    return store.list_dependencies(tenant)
 
 
 @router.post("/bifurcations", response_model=Bifurcation, status_code=201)
-def create_bifurcation(payload: BifurcationCreate, store: SandboxStore = Depends(get_store)) -> Bifurcation:
-    return store.create_bifurcation(payload)
+def create_bifurcation(payload: BifurcationCreate, store: SandboxStore = Depends(get_store),
+                       tenant: str = Depends(tenant_context)) -> Bifurcation:
+    return store.create_bifurcation(payload.model_copy(update={"owner_tenant_ref": tenant}))
+
+
+@router.post("/service-definitions", response_model=ServiceDefinition, status_code=201)
+def create_service_definition(payload: ServiceDefinitionCreate, store: SandboxStore = Depends(get_store),
+                              tenant: str = Depends(tenant_context)) -> ServiceDefinition:
+    return store.create_service_definition(tenant, payload)
+
+
+@router.get("/service-definitions", response_model=list[ServiceDefinition])
+def list_service_definitions(store: SandboxStore = Depends(get_store),
+                             tenant: str = Depends(tenant_context)) -> list[ServiceDefinition]:
+    return store.list_service_definitions(tenant)
+
+
+@router.post("/external-compute-providers", response_model=ExternalComputeProvider, status_code=201)
+def create_external_compute_provider(payload: ExternalComputeProviderCreate,
+                                     store: SandboxStore = Depends(get_store),
+                                     tenant: str = Depends(tenant_context)) -> ExternalComputeProvider:
+    return store.create_external_compute_provider(tenant, payload)
+
+
+@router.get("/external-compute-providers", response_model=list[ExternalComputeProvider])
+def list_external_compute_providers(store: SandboxStore = Depends(get_store),
+                                    tenant: str = Depends(tenant_context)) -> list[ExternalComputeProvider]:
+    return store.list_external_compute_providers(tenant)
+
+
+@router.post("/usage-events", response_model=UsageEvent, status_code=202)
+def record_usage_event(payload: UsageEventCreate, store: SandboxStore = Depends(get_store),
+                       tenant: str = Depends(tenant_context)) -> UsageEvent:
+    return store.record_usage_event(tenant, payload)
+
+
+@router.get("/usage-events", response_model=list[UsageEvent])
+def list_usage_events(store: SandboxStore = Depends(get_store),
+                      tenant: str = Depends(tenant_context)) -> list[UsageEvent]:
+    return store.list_usage_events(tenant)
 
 
 @router.post("/bifurcations/{bifurcation_id}/consume", response_model=Bifurcation)

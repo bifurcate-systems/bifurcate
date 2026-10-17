@@ -169,8 +169,10 @@ class ResourceBinding(BaseModel):
 
 
 class ResourceCreate(BaseModel):
+    owner_tenant_ref: str = Field(default="legacy", pattern=r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
     name: str = Field(min_length=1)
     kind: ResourceKind
+    resource_class: str = Field(default="generic.resource.v1", pattern=r"^[a-z][a-z0-9._/-]{2,127}$")
     owner: str = Field(default="owner", min_length=1)
     status: ResourceStatus = ResourceStatus.ONLINE
     binding: ResourceBinding = Field(default_factory=ResourceBinding)
@@ -200,6 +202,7 @@ class Resource(ResourceCreate):
 
 
 class ResourceDependencyCreate(BaseModel):
+    owner_tenant_ref: str = Field(default="legacy", pattern=r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
     upstream_resource_id: str
     downstream_resource_id: str
     relation: DependencyRelation = DependencyRelation.REQUIRES
@@ -224,6 +227,7 @@ class ResourceDependency(ResourceDependencyCreate):
 
 
 class BifurcationCreate(BaseModel):
+    owner_tenant_ref: str = Field(default="legacy", pattern=r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
     agent_id: str = Field(min_length=1)
     purpose: str = Field(min_length=1)
     terminal_resource_id: str
@@ -267,6 +271,84 @@ class BifurcationConsumption(BaseModel):
     sandbox_instance_ref: str = Field(min_length=1)
     model_route_ref: str = Field(min_length=1)
     evidence_uri: str | None = None
+
+
+class MeterDefinition(BaseModel):
+    code: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    unit: str = Field(min_length=1, max_length=80)
+    aggregation: str = Field(pattern=r"^(sum|gauge_time_integral|maximum)$")
+    source: str = Field(min_length=1, max_length=120)
+
+
+class ServiceDefinitionCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    resource_class: str = Field(pattern=r"^[a-z][a-z0-9._/-]{2,127}$")
+    version: int = Field(ge=1)
+    meters: list[MeterDefinition] = Field(min_length=1)
+    capabilities: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_definition_secrets(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return ensure_no_secret_keys(value, "service definition metadata")
+
+
+class ServiceDefinition(ServiceDefinitionCreate):
+    id: str = Field(default_factory=lambda: new_id("svcdef"))
+    owner_tenant_ref: str
+    published_at: datetime = Field(default_factory=now_utc)
+
+
+class ExternalComputeProviderCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    resource_class: str = Field(pattern=r"^[a-z][a-z0-9._/-]{2,127}$")
+    region_ref: str = Field(min_length=1, max_length=120)
+    capabilities: list[str] = Field(default_factory=list)
+    capacity: dict[str, float] = Field(default_factory=dict)
+    evidence_ref: str = Field(min_length=3, max_length=500)
+    meter_codes: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("metadata")
+    @classmethod
+    def reject_provider_secrets(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return ensure_no_secret_keys(value, "external provider metadata")
+
+
+class ExternalComputeProvider(ExternalComputeProviderCreate):
+    id: str = Field(default_factory=lambda: new_id("provider"))
+    owner_tenant_ref: str
+    status: str = "declared"
+    created_at: datetime = Field(default_factory=now_utc)
+
+
+class UsageEventCreate(BaseModel):
+    event_id: str = Field(pattern=r"^ue_[a-f0-9]{32}$")
+    resource_ref: str = Field(min_length=1, max_length=500)
+    service_class: str = Field(min_length=3, max_length=128)
+    meter: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    quantity: float = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=80)
+    period_start: datetime
+    period_end: datetime
+    region_ref: str = Field(min_length=1, max_length=120)
+    evidence_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    dimensions: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_period(self) -> "UsageEventCreate":
+        if self.period_end <= self.period_start:
+            raise ValueError("period_end must be after period_start")
+        return self
+
+
+class UsageEvent(UsageEventCreate):
+    owner_tenant_ref: str
+    schema_version: str = "usage.re8ch.com/v1"
+    pricing_applied: bool = False
+    accounting_posted: bool = False
+    observed_at: datetime = Field(default_factory=now_utc)
 
 
 class BifurcationLineage(BaseModel):
