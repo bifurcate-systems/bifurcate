@@ -64,6 +64,12 @@ from .models import (
     TaskStatus,
     TaskResult,
     TaskView,
+    ServiceDefinition,
+    ServiceDefinitionCreate,
+    ExternalComputeProvider,
+    ExternalComputeProviderCreate,
+    UsageEvent,
+    UsageEventCreate,
     now_utc,
 )
 
@@ -89,6 +95,9 @@ class SandboxStore:
         self.intent_by_idempotency_key: dict[str, str] = {}
         self.entity_evidence: dict[str, EntityEvidence] = {}
         self.standard_resource_ids: dict[str, str] = {}
+        self.service_definitions: dict[str, ServiceDefinition] = {}
+        self.external_compute_providers: dict[str, ExternalComputeProvider] = {}
+        self.usage_events: dict[str, UsageEvent] = {}
         self.state_path = Path(state_path) if state_path else None
         self._load_state()
 
@@ -107,6 +116,9 @@ class SandboxStore:
         "tasks": AgentTask,
         "resource_intents": ResourceIntent,
         "entity_evidence": EntityEvidence,
+        "service_definitions": ServiceDefinition,
+        "external_compute_providers": ExternalComputeProvider,
+        "usage_events": UsageEvent,
     }
 
     def persist(self) -> None:
@@ -442,15 +454,18 @@ class SandboxStore:
             )
             return resource
 
-    def list_resources(self) -> list[Resource]:
+    def list_resources(self, tenant_ref: str | None = None) -> list[Resource]:
         with self._lock:
             self._expire_grants()
-            return list(self.resources.values())
+            return [item for item in self.resources.values()
+                    if tenant_ref is None or item.owner_tenant_ref == tenant_ref]
 
     def create_dependency(self, payload: ResourceDependencyCreate, actor_id: str = "owner") -> ResourceDependency:
         with self._lock:
-            self._require_resource(payload.upstream_resource_id)
-            self._require_resource(payload.downstream_resource_id)
+            upstream = self._require_resource(payload.upstream_resource_id)
+            downstream = self._require_resource(payload.downstream_resource_id)
+            if upstream.owner_tenant_ref != payload.owner_tenant_ref or downstream.owner_tenant_ref != payload.owner_tenant_ref:
+                raise HTTPException(status_code=403, detail="cross-tenant resource dependency denied")
             dependency = ResourceDependency(**payload.model_dump())
             self.dependencies[dependency.id] = dependency
             if self._has_dependency_cycle():
@@ -465,13 +480,16 @@ class SandboxStore:
             )
             return dependency
 
-    def list_dependencies(self) -> list[ResourceDependency]:
+    def list_dependencies(self, tenant_ref: str | None = None) -> list[ResourceDependency]:
         with self._lock:
-            return list(self.dependencies.values())
+            return [item for item in self.dependencies.values()
+                    if tenant_ref is None or item.owner_tenant_ref == tenant_ref]
 
     def create_bifurcation(self, payload: BifurcationCreate) -> Bifurcation:
         with self._lock:
             terminal = self._require_resource(payload.terminal_resource_id)
+            if terminal.owner_tenant_ref != payload.owner_tenant_ref:
+                raise HTTPException(status_code=403, detail="cross-tenant bifurcation denied")
             resource_ids, edge_ids = self._lineage_for(terminal.id)
             bifurcation = Bifurcation(
                 **payload.model_dump(),
@@ -493,9 +511,79 @@ class SandboxStore:
             )
             return bifurcation
 
-    def consume_bifurcation(self, bifurcation_id: str, payload: BifurcationConsumption) -> Bifurcation:
+    def create_service_definition(self, tenant_ref: str, payload: ServiceDefinitionCreate) -> ServiceDefinition:
+        with self._lock:
+            key = f"{tenant_ref}:{payload.resource_class}:v{payload.version}"
+            if key in self.service_definitions:
+                existing = self.service_definitions[key]
+                if existing.model_dump(exclude={"id", "published_at"}) != {
+                    **payload.model_dump(), "owner_tenant_ref": tenant_ref
+                }:
+                    raise HTTPException(status_code=409, detail="published service definition is immutable")
+                return existing
+            definition = ServiceDefinition(**payload.model_dump(), owner_tenant_ref=tenant_ref)
+            self.service_definitions[key] = definition
+            return definition
+
+    def list_service_definitions(self, tenant_ref: str) -> list[ServiceDefinition]:
+        return [item for item in self.service_definitions.values() if item.owner_tenant_ref == tenant_ref]
+
+    def create_external_compute_provider(self, tenant_ref: str,
+                                         payload: ExternalComputeProviderCreate) -> ExternalComputeProvider:
+        with self._lock:
+            definition_key = (
+                f"{tenant_ref}:{payload.resource_class}:v{payload.service_definition_version}"
+            )
+            definition = self.service_definitions.get(definition_key)
+            if definition is None:
+                raise HTTPException(status_code=422, detail="service definition is not published by tenant")
+            declared_meters = {meter.code for meter in definition.meters}
+            if not set(payload.meter_codes).issubset(declared_meters):
+                raise HTTPException(status_code=422, detail="provider contains undeclared meters")
+            provider = ExternalComputeProvider(**payload.model_dump(), owner_tenant_ref=tenant_ref)
+            self.external_compute_providers[provider.id] = provider
+            return provider
+
+    def list_external_compute_providers(self, tenant_ref: str) -> list[ExternalComputeProvider]:
+        return [item for item in self.external_compute_providers.values() if item.owner_tenant_ref == tenant_ref]
+
+    def record_usage_event(self, tenant_ref: str, payload: UsageEventCreate) -> UsageEvent:
+        with self._lock:
+            existing = self.usage_events.get(payload.event_id)
+            candidate = UsageEvent(**payload.model_dump(), owner_tenant_ref=tenant_ref)
+            if existing:
+                if existing != candidate:
+                    raise HTTPException(status_code=409, detail="usage event idempotency conflict")
+                return existing
+            definition_key = (
+                f"{tenant_ref}:{payload.service_class}:v{payload.service_definition_version}"
+            )
+            definition = self.service_definitions.get(definition_key)
+            if definition is None:
+                raise HTTPException(status_code=422, detail="service definition is not published by tenant")
+            provider = self.external_compute_providers.get(payload.resource_ref)
+            if (
+                provider is None
+                or provider.owner_tenant_ref != tenant_ref
+                or provider.resource_class != payload.service_class
+                or provider.service_definition_version != payload.service_definition_version
+            ):
+                raise HTTPException(status_code=422, detail="usage resource is not an owned provider")
+            meter = next((item for item in definition.meters if item.code == payload.meter), None)
+            if meter is None or meter.unit != payload.unit or payload.meter not in provider.meter_codes:
+                raise HTTPException(status_code=422, detail="usage meter is not declared")
+            self.usage_events[payload.event_id] = candidate
+            return candidate
+
+    def list_usage_events(self, tenant_ref: str) -> list[UsageEvent]:
+        return [item for item in self.usage_events.values() if item.owner_tenant_ref == tenant_ref]
+
+    def consume_bifurcation(self, bifurcation_id: str, payload: BifurcationConsumption,
+                            tenant_ref: str | None = None) -> Bifurcation:
         with self._lock:
             bifurcation = self._require_bifurcation(bifurcation_id)
+            if tenant_ref is not None and bifurcation.owner_tenant_ref != tenant_ref:
+                raise HTTPException(status_code=404, detail="bifurcation not found")
             if bifurcation.status != "ready":
                 raise HTTPException(status_code=409, detail="bifurcation is not ready")
             bifurcation.status = "consumed"
@@ -520,9 +608,12 @@ class SandboxStore:
             )
             return bifurcation
 
-    def get_bifurcation_lineage(self, bifurcation_id: str) -> BifurcationLineage:
+    def get_bifurcation_lineage(self, bifurcation_id: str,
+                                tenant_ref: str | None = None) -> BifurcationLineage:
         with self._lock:
             bifurcation = self._require_bifurcation(bifurcation_id)
+            if tenant_ref is not None and bifurcation.owner_tenant_ref != tenant_ref:
+                raise HTTPException(status_code=404, detail="bifurcation not found")
             return BifurcationLineage(
                 bifurcation=bifurcation,
                 resources=[self.resources[item] for item in bifurcation.dependency_resource_ids],
@@ -743,10 +834,12 @@ class SandboxStore:
             )
             return task
 
-    def get_resource_state(self, resource_id: str) -> ResourceState:
+    def get_resource_state(self, resource_id: str, tenant_ref: str | None = None) -> ResourceState:
         with self._lock:
             self._expire_grants()
             resource = self._require_resource(resource_id)
+            if tenant_ref is not None and resource.owner_tenant_ref != tenant_ref:
+                raise HTTPException(status_code=404, detail="resource not found")
             executor = self.executors.get(resource.binding.executor_id or "")
             account_profiles = [account for account in self.account_profiles.values() if account.resource_id == resource_id]
             active_grant = self._active_grant_for_resource(resource_id)

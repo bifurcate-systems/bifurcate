@@ -1,0 +1,43 @@
+name: Reviewer App
+
+on:
+  workflow_run:
+    workflows: [Validate]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  approve:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0].head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create reviewer installation token
+        id: reviewer-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RE8CH_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.RE8CH_REVIEWER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: bifurcate
+          permission-pull-requests: write
+
+      - name: Approve the validated pull request
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current_sha="$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
+          test "$current_sha" = "$VALIDATED_SHA"
+          gh api \
+            --method POST \
+            "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
+            -f event=APPROVE \
+            -f commit_id="$VALIDATED_SHA" \
+            -f body='Approved automatically by the least-privilege RE8CH reviewer app after Validate succeeded.'
