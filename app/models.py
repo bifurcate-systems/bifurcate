@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -246,6 +246,7 @@ class BifurcationCreate(BaseModel):
 
 class Bifurcation(BaseModel):
     id: str = Field(default_factory=lambda: new_id("bif"))
+    owner_tenant_ref: str
     agent_id: str
     purpose: str
     terminal_resource_id: str
@@ -303,10 +304,11 @@ class ServiceDefinition(ServiceDefinitionCreate):
 class ExternalComputeProviderCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     resource_class: str = Field(pattern=r"^[a-z][a-z0-9._/-]{2,127}$")
+    service_definition_version: int = Field(ge=1)
     region_ref: str = Field(min_length=1, max_length=120)
     capabilities: list[str] = Field(default_factory=list)
     capacity: dict[str, float] = Field(default_factory=dict)
-    evidence_ref: str = Field(min_length=3, max_length=500)
+    evidence_ref: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     meter_codes: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -327,6 +329,7 @@ class UsageEventCreate(BaseModel):
     event_id: str = Field(pattern=r"^ue_[a-f0-9]{32}$")
     resource_ref: str = Field(min_length=1, max_length=500)
     service_class: str = Field(min_length=3, max_length=128)
+    service_definition_version: int = Field(ge=1)
     meter: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
     quantity: float = Field(gt=0)
     unit: str = Field(min_length=1, max_length=80)
@@ -340,6 +343,13 @@ class UsageEventCreate(BaseModel):
     def validate_period(self) -> "UsageEventCreate":
         if self.period_end <= self.period_start:
             raise ValueError("period_end must be after period_start")
+        current = now_utc()
+        if self.period_end > current + timedelta(minutes=5):
+            raise ValueError("period_end is too far in the future")
+        if self.period_start < current - timedelta(days=31):
+            raise ValueError("period_start is outside the acceptance window")
+        if self.period_end - self.period_start > timedelta(days=1):
+            raise ValueError("usage period must not exceed 24 hours")
         return self
 
 

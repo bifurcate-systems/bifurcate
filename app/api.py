@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from .models import (
@@ -58,9 +62,20 @@ def get_store(request: Request) -> SandboxStore:
     return request.app.state.store
 
 
-def tenant_context(x_re8ch_tenant: str = Header(default="legacy")) -> str:
+def tenant_context(
+    x_re8ch_tenant: str = Header(default="legacy"),
+    x_re8ch_tenant_signature: str | None = Header(default=None),
+) -> str:
     if not x_re8ch_tenant or len(x_re8ch_tenant) > 80:
         raise HTTPException(status_code=400, detail="invalid tenant context")
+    context_secret = os.getenv("BIFURCATE_TENANT_CONTEXT_SECRET")
+    if context_secret:
+        expected = hmac.new(
+            context_secret.encode(), x_re8ch_tenant.encode(), hashlib.sha256
+        ).hexdigest()
+        supplied = (x_re8ch_tenant_signature or "").removeprefix("sha256=")
+        if not hmac.compare_digest(expected, supplied):
+            raise HTTPException(status_code=401, detail="verified tenant context required")
     return x_re8ch_tenant
 
 
@@ -205,20 +220,23 @@ def consume_bifurcation(
     bifurcation_id: str,
     payload: BifurcationConsumption,
     store: SandboxStore = Depends(get_store),
+    tenant: str = Depends(tenant_context),
 ) -> Bifurcation:
-    return store.consume_bifurcation(bifurcation_id, payload)
+    return store.consume_bifurcation(bifurcation_id, payload, tenant)
 
 
 @router.get("/bifurcations/{bifurcation_id}/lineage", response_model=BifurcationLineage)
 def get_bifurcation_lineage(
-    bifurcation_id: str, store: SandboxStore = Depends(get_store)
+    bifurcation_id: str, store: SandboxStore = Depends(get_store),
+    tenant: str = Depends(tenant_context),
 ) -> BifurcationLineage:
-    return store.get_bifurcation_lineage(bifurcation_id)
+    return store.get_bifurcation_lineage(bifurcation_id, tenant)
 
 
 @router.get("/resources/{resource_id}/state", response_model=ResourceState)
-def get_resource_state(resource_id: str, store: SandboxStore = Depends(get_store)) -> ResourceState:
-    return store.get_resource_state(resource_id)
+def get_resource_state(resource_id: str, store: SandboxStore = Depends(get_store),
+                       tenant: str = Depends(tenant_context)) -> ResourceState:
+    return store.get_resource_state(resource_id, tenant)
 
 
 @router.post("/account-profiles", response_model=AccountProfile, status_code=201)
