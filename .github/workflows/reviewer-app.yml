@@ -13,7 +13,8 @@ jobs:
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.pull_requests[0].head.repo.full_name == github.repository
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number != null
     runs-on: ubuntu-latest
     steps:
       - name: Create reviewer installation token
@@ -24,9 +25,10 @@ jobs:
           private-key: ${{ secrets.RE8CH_REVIEWER_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: bifurcate
+          permission-contents: write
           permission-pull-requests: write
 
-      - name: Approve the validated pull request
+      - name: Approve and merge the validated pull request
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
@@ -35,9 +37,16 @@ jobs:
         run: |
           current_sha="$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
           test "$current_sha" = "$VALIDATED_SHA"
+          gh pr checks "$PR_NUMBER" --watch --fail-fast --interval 10
           gh api \
             --method POST \
             "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
             -f event=APPROVE \
             -f commit_id="$VALIDATED_SHA" \
             -f body='Approved automatically by the least-privilege RE8CH reviewer app after Validate succeeded.'
+          gh api \
+            --method PUT \
+            "repos/$GH_REPO/pulls/$PR_NUMBER/merge" \
+            -f sha="$VALIDATED_SHA" \
+            -f merge_method=merge \
+            --jq '{merged, message, sha}'
