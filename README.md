@@ -1,8 +1,8 @@
 # Bifurcate
 
 > Experimental source import from `re8ch/cloud-functions` commit `b35cdf1`.
-> This service is not production-ready: its current API is not tenant-isolated,
-> and it must not be exposed to untrusted clients or deployed as a shared service.
+> Tenant-scoped Catalog resources use verified organization context, immutable
+> service-definition versions, provider bindings, and neutral usage events.
 
 Bifurcate is the purpose-to-consumption resource lineage control plane for
 agents. It records how homogeneous compute, network, storage, model and context
@@ -74,6 +74,12 @@ Open `http://127.0.0.1:8090/console/`.
 - `POST /api/v1/resource-dependencies`
 - `GET /api/v1/resource-dependencies`
 - `POST /api/v1/bifurcations`
+- `POST /api/v1/service-definitions`
+- `GET /api/v1/service-definitions`
+- `POST /api/v1/external-compute-providers`
+- `GET /api/v1/external-compute-providers`
+- `POST /api/v1/usage-events`
+- `GET /api/v1/usage-events`
 - `GET /api/v1/bifurcations/{id}/lineage`
 - `POST /api/v1/bifurcations/{id}/consume`
 - `GET /api/v1/resources/{resource_id}/state`
@@ -96,3 +102,10 @@ Metadata is accepted only for coordination state. Requests containing obvious
 secret-like keys such as `password`, `token`, `secret`, `api_key`, or
 `private_key` are rejected. Store references such as `device-local:wechat-main`
 or `devbox-profile:aliyun-prod`, not credentials.
+
+## Tenant Context
+
+Set `BIFURCATE_TENANT_CONTEXT_SECRET` in shared deployments. The trusted Catalog
+BFF sends `X-RE8CH-Tenant` together with `X-RE8CH-Tenant-Signature`, computed as
+`sha256=<HMAC-SHA256(secret, tenantRef)>`. Direct clients must not be given this
+secret. `BIFURCATE_WRITE_TOKEN` continues to protect mutation endpoints.
