@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /opt/bifurcate
 COPY pyproject.toml README.md ./
 COPY app ./app
-RUN pip install --no-cache-dir --index-url https://mirrors.aliyun.com/pypi/simple .
+RUN pip install --no-cache-dir .
 RUN addgroup --system --gid 10001 bifurcate && adduser --system --uid 10001 --ingroup bifurcate bifurcate
 USER 10001:10001
 EXPOSE 8080
