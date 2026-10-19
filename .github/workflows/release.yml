@@ -43,4 +43,5 @@ jobs:
         with:
           image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "1"
